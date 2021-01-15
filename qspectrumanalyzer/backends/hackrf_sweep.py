@@ -140,32 +140,39 @@ class PowerThread(BasePowerThread):
 
     def run(self):
         """hackrf_sweep thread main loop"""
-        self.process_start()
         self.alive = True
         self.powerThreadStarted.emit()
 
         while self.alive:
-            try:
-                buf = self.process.stdout.read(4)
-            except AttributeError as e:
-                print(e, file=sys.stderr)
-                continue
-
-            if buf:
-                (record_length,) = struct.unpack('I', buf)
+            self.process_start()
+            while self.alive:
                 try:
-                    buf = self.process.stdout.read(record_length)
+                    buf = self.process.stdout.read(4)
                 except AttributeError as e:
                     print(e, file=sys.stderr)
                     continue
 
                 if buf:
-                    self.parse_output(buf)
-                else:
-                    break
-            else:
-                break
+                    (record_length,) = struct.unpack('I', buf)
+                    try:
+                        buf = self.process.stdout.read(record_length)
+                    except AttributeError as e:
+                        print(e, file=sys.stderr)
+                        continue
 
-        self.process_stop()
+                    if buf:
+                        self.parse_output(buf)
+                    #else:
+                    #    break
+                else:
+                    if self.process is None or self.process.poll() is not None:
+                        # Executable exited.
+                        break
+                #    break
+
+            self.process_stop()
+            if self.params["single_shot"]:            
+                break
+            
         self.alive = False
         self.powerThreadStopped.emit()
